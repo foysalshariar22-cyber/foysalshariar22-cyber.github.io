@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trader vs. Coach</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap">
+<style>
+:root{--bg:#eef2f5;--card:#fff;--ink:#14202b;--mute:#5b6b79;--line:#d5dde4;--coach:#2457d6;--coachbg:#e6edfc;--gain:#13794a;--loss:#b42318;--btn:#14202b;--btntxt:#fff;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1720;--card:#18232f;--ink:#e8eef3;--mute:#9bacba;--line:#2b3a48;--coach:#7da3ff;--coachbg:#1b2a4a;--gain:#4cc38a;--loss:#ff7b6e;--btn:#e8eef3;--btntxt:#0f1720;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1720;--card:#18232f;--ink:#e8eef3;--mute:#9bacba;--line:#2b3a48;--coach:#7da3ff;--coachbg:#1b2a4a;--gain:#4cc38a;--loss:#ff7b6e;--btn:#e8eef3;--btntxt:#0f1720;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:640px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:2rem;line-height:1.15;margin:0 0 8px;letter-spacing:-.02em}
+h2{font-size:1.25rem;margin:0 0 8px}
+p{margin:0 0 12px}
+.mute{color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 14px}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:12px 14px;min-height:44px}
+button:focus-visible,input:focus-visible{outline:3px solid var(--coach);outline-offset:2px}
+button.primary{background:var(--btn);color:var(--btntxt);border-color:var(--btn);font-weight:600}
+button:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>button{flex:1 1 140px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.stat{flex:1 1 90px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:1.25rem}
+.stat span{font-size:.85rem;color:var(--mute)}
+.headline{font-size:1.3rem;font-weight:700;line-height:1.25;margin:0 0 4px}
+.coach{background:var(--coachbg);border-left:4px solid var(--coach);border-radius:8px;padding:12px 14px;margin:0 0 14px}
+.coach b{color:var(--coach)}
+.up{color:var(--gain)}.down{color:var(--loss)}
+svg{width:100%;height:auto;display:block}
+.bar{height:6px;background:var(--line);border-radius:3px;margin:0 0 14px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ink)}
+input.txt,input.share{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);margin:6px 0 12px}
+ul{padding-left:20px;margin:0 0 12px}
+li{margin:0 0 6px}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+const START=10000;
+const ROUNDS=[
+{h:"Quiet week: prices barely move",s:"Not much news. Your feed is calm.",c:.5,k:"c"},
+{h:"A small dip, and nobody seems worried",s:"Prices slip a little. Experts shrug.",c:-.8,k:"c"},
+{h:"Slow day. Experts say there is nothing to see",s:"Almost no change. A few people say it’s boring.",c:.4,k:"c"},
+{h:"Hot stocks soar as small investors pile in",s:"Everyone online is posting big gains.",c:6,k:"h"},
+{h:"“To the moon!” A famous stock doubles in a week",s:"Friends are bragging about their profits.",c:8,k:"h"},
+{h:"Prices wobble. Posts say: buy more, it’s cheap!",s:"A small drop, and your feed shouts “buy more.”",c:-5,k:"h"},
+{h:"Rally roars back. Don’t miss out!",s:"Prices jump again and the excitement peaks.",c:10,k:"h"},
+{h:"Stock market falls 7% in one day",s:"Prices drop sharply. Social media fills with panic posts.",c:-7,k:"f"},
+{h:"Experts warn that banks may run short of cash",s:"More bad news, and your feed is full of “get out now!”",c:-4,k:"f"},
+{h:"Rumors of a scandal hit a popular company",s:"Nobody knows what is true yet, but prices fall fast.",c:-8,k:"f"},
+{h:"A big company says it will earn much less",s:"Its price tumbles and other companies follow.",c:-5,k:"f"},
+{h:"Bounce fades as people worry about higher loan costs",s:"The rise stops and prices slip again.",c:-6,k:"f"}
+];
+let AUTO=[];
+const money=n=>"$"+Math.round(n).toLocaleString("en-US");
+const pct=n=>(n>0?"+":"")+n.toFixed(1)+"%";
+let S;
+function auto(){let v=START,h=[v];ROUNDS.forEach(r=>{v*=1+r.c/100;h.push(v)});return h}
+function fresh(coach){return {coach,r:0,v:START,e:1,peak:START,dd:0,t:0,h:[START],step:"decide",last:null,pick:null}}
+function coachMsg(){
+const k=ROUNDS[S.r].k,t=S.t,e=S.e;
+if(k==="f")return e>1?"Heads up: over 100% invested means bad days hurt extra.":t>=2?`You’ve traded ${t} times already. Quick moves after bad news often lock in losses.`:"Take a breath. One scary headline doesn’t mean prices will keep falling.";
+if(k==="h")return e>1?"You’re over 100% invested. If the hype ends, losses hit harder.":"Lots of hype out there. Buying just because others are is how people get caught.";
+if(k==="u")return e<1?"Understandable to sell. Prices often bounce back while news still looks gloomy.":"Bounces don’t always last. Sticking to your plan usually wins.";
+return t>=2?`${t} trades so far. Quiet days can tempt us to act.`:"Calm days are normal. Doing nothing is a fine choice."}
+function chart(h,showAuto){
+const all=showAuto?h.concat(AUTO):h;
+const lo=Math.min(...all)-250,hi=Math.max(...all)+250,W=320,H=130,n=h.length-1;
+const x=i=>10+i*(W-20)/n,y=v=>H-10-(v-lo)/(hi-lo)*(H-20);
+const pts=a=>a.map((v,i)=>x(i)+","+y(v)).join(" ");
+let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Portfolio value over rounds">`;
+s+=`<line x1="10" x2="${W-10}" y1="${y(START)}" y2="${y(START)}" stroke="var(--line)" stroke-dasharray="3 3"/>`;
+if(showAuto)s+=`<polyline points="${pts(AUTO)}" fill="none" stroke="var(--mute)" stroke-width="2" stroke-dasharray="5 4"/>`;
+s+=`<polyline points="${pts(h)}" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round"/>`;
+h.forEach((v,i)=>{s+=`<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="var(--ink)"/>`});
+return s+"</svg>"}
+function stats(){return `<div class="stats"><div class="stat"><b>${money(S.v)}</b><span>Portfolio</span></div><div class="stat"><b>${S.t}</b><span>Trades</span></div><div class="stat"><b>${Math.round(S.e*100)}%</b><span>Invested</span></div></div>`}
+function start(){
+document.getElementById("app").innerHTML=`<h1>Trader vs. Coach</h1>
+<p class="mute">Twelve rounds of market news: a quiet stretch, a hype rally, then a crash. Turn the AI coach on or off to see if it changes what you do.</p>
+<div class="card"><h2>How it works</h2><ul><li>You start with ${money(START)}, fully invested.</li><li>Each round shows a news headline. Choose to hold (do nothing), sell half, or buy more (this borrows money, so gains and losses both get bigger).</li><li>Turn the coach on to see a short tip each round.</li></ul></div>
+<div class="card"><h2>Ready?</h2>
+<label style="display:block;margin:0 0 12px"><input type="checkbox" id="co"> Turn on the coach</label>
+<button class="primary" id="go" style="width:100%">Start</button></div>
+<p class="mute">This is a simplified game, not financial advice.</p>`;
+document.getElementById("go").onclick=()=>{AUTO=auto();S=fresh(document.getElementById("co").checked);play()}}
+function play(){
+const R=ROUNDS[S.r],coach=S.coach;
+let html=`<div class="bar"><i style="width:${S.r/ROUNDS.length*100}%"></i></div><p class="mute">Round ${S.r+1} of ${ROUNDS.length}${coach?", coach on":""}</p>`+stats()+`<div class="card">${chart(S.h)}</div>`;
+if(S.step==="decide"){
+html+=`<div class="card"><p class="headline">${R.h}</p><p class="mute">${R.s}</p></div>`;
+if(coach)html+=`<div class="coach"><b>Coach:</b> ${coachMsg()}</div>`;
+html+=`<div class="row"><button data-a="hold">Hold</button><button data-a="sell" ${S.e===0?"disabled":""}>Sell half</button><button data-a="buy" ${S.e>=1.5?"disabled":""}>Buy more</button></div>`;
+}else{
+const d=S.last;
+html+=`<div class="card"><p class="headline">You chose: ${S.pick}</p><p>The market moved <b class="${R.c>0?"up":"down"}">${pct(R.c)}</b>. Your portfolio changed by <b class="${d>=0?"up":"down"}">${money(Math.abs(d))} ${d>=0?"gain":"loss"}</b>.</p></div><button class="primary" id="next" style="width:100%">${S.r+1<ROUNDS.length?"Next round":"See results"}</button>`}
+const a=document.getElementById("app");a.innerHTML=html;
+a.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>choose(b.dataset.a));
+const n=document.getElementById("next");if(n)n.onclick=()=>{S.r++;S.step="decide";S.r<ROUNDS.length?play():result()}}
+function choose(a){
+const R=ROUNDS[S.r];
+if(a==="sell"){S.e*=.5;S.t++;S.pick="Sell half"}
+else if(a==="buy"){S.e=Math.min(1.5,S.e+.5);S.t++;S.pick="Buy more"}
+else S.pick="Hold";
+const before=S.v;S.v*=1+S.e*R.c/100;S.last=S.v-before;S.h.push(S.v);
+S.peak=Math.max(S.peak,S.v);S.dd=Math.max(S.dd,(S.peak-S.v)/S.peak);
+S.step="result";play()}
+function result(){
+const end=S.h[S.h.length-1],autoEnd=AUTO[AUTO.length-1],diff=end-autoEnd;
+const summary=`${S.coach?"Coach on":"No coach"}: ${money(end)}, worst drop ${(S.dd*100).toFixed(0)}%, ${S.t} trade${S.t===1?"":"s"}`;
+const msg=S.t===0?"You held through everything, like the autopilot line.":diff>=0?"Your trades beat simply holding in this game.":"Your trades did worse than simply holding in this game.";
+document.getElementById("app").innerHTML=`<h1>Your results</h1>
+<div class="card">${chart(S.h,true)}<p class="mute" style="margin:8px 0 0">Solid line: you. Dashed line: holding every round.</p></div>
+<div class="stats"><div class="stat"><b>${money(end)}</b><span>Final value</span></div><div class="stat"><b>${(S.dd*100).toFixed(0)}%</b><span>Worst drop</span></div><div class="stat"><b>${S.t}</b><span>Trades</span></div></div>
+<p>${msg} Holding every round would have ended at ${money(autoEnd)}.</p>
+<div class="card"><h2>Share your result</h2><p class="mute">Copy this line into the chat so your presenter can compare the coach and no-coach players.</p><input class="share" id="sh" readonly value="${summary}"><button id="cp" style="width:100%">Copy result</button></div>
+<div class="card"><h2>Talk about it</h2><ul><li>Which headline made you want to act the most?</li><li>If you had the coach, did you follow it? Did it ever make you want to do the opposite?</li><li>How would an AI know whether selling is panic or good judgment?</li></ul></div>
+<p class="mute">One short game is not evidence. The paper’s own results come from simulated traders, and real people may react differently.</p>
+<div class="row"><button class="primary" id="again">Play again</button></div>`;
+document.getElementById("again").onclick=start;
+document.getElementById("cp").onclick=async()=>{const i=document.getElementById("sh");i.select();try{await navigator.clipboard.writeText(i.value);document.getElementById("cp").textContent="Copied"}catch(e){document.getElementById("cp").textContent="Press Ctrl+C to copy"}}}
+start();
+</script>
+</body>
+</html>
